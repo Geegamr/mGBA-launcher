@@ -1,3 +1,10 @@
 #-------------Chat AI Handoffs-------------
 Chat Handoffs/Handoff-*.md
 #-------------Everything else-------------
+.venv/
+build/
+dist/
+__pycache__/
+*.py[cod]
+*.log
+.vscode/
