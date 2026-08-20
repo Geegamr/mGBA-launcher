@@ -3,7 +3,7 @@ mGBA Launcher
 
 The Logo used for the app is trademarked or copyrighted by mGBA and they own all the rights for it
 
-=============
+---
 
 A small tile-based GUI launcher for mGBA ROMs built with tkinter and Pillow.
 

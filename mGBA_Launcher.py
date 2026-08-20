@@ -37,9 +37,11 @@ CONFIG_FILE = CONFIG_DIR / 'config.json'
 
 if getattr(sys, 'frozen', False):
     APP_DIR = Path(sys.executable).parent
+    # When frozen, prefer the placeholder bundled inside the exe (sys._MEIPASS)
+    PLACEHOLDER_FILE = Path(getattr(sys, '_MEIPASS', APP_DIR)) / 'placeholder.png'
 else:
     APP_DIR = Path(__file__).parent
-PLACEHOLDER_FILE = APP_DIR / 'placeholder.png'
+    PLACEHOLDER_FILE = APP_DIR / 'placeholder.png'
 
 ROM_EXTENSIONS = {'.gba', '.zip'}
 ICON_EXTENSIONS = ['.png', '.gif', '.jpg', '.jpeg', '.bmp']
@@ -53,6 +55,14 @@ SORT_MODES = {
     'name_desc': 'Name Z-A',
     'date_new': 'Newest First',
     'date_old': 'Oldest First',
+}
+
+# Theme color palettes (single source of truth)
+THEMES = {
+    'dark':  {'bg': '#1e1e1e', 'fg': '#e0e0e0', 'card': '#2d2d30',
+              'accent': '#007acc', 'tb': '#3c3c3c'},
+    'light': {'bg': '#f5f5f5', 'fg': '#202020', 'card': '#ffffff',
+              'accent': '#0066cc', 'tb': '#d0d0d0'},
 }
 
 # --- Default Configuration ---
@@ -155,6 +165,8 @@ class SetupWizard(tk.Toplevel):
         self.icons_var = tk.StringVar()
         self.mgba_var = tk.StringVar()
         self.theme_var = tk.StringVar(value='dark')
+        bg, fg, card, accent = _configure_base_styles(self.theme_var.get())
+        self.configure(bg=bg)
         self._build_form()
         self._center_window()
         self.bind('<Escape>', self._on_cancel)
@@ -269,12 +281,9 @@ class RomTile(ttk.Frame):
         self._build()
 
     def _build(self):
-        if self.theme_name == 'dark':
-            btn_bg = '#2d2d30'
-            title_color = '#e0e0e0'
-        else:
-            btn_bg = '#ffffff'
-            title_color = '#202020'
+        palette = THEMES[self.theme_name]
+        btn_bg = palette['card']
+        title_color = palette['fg']
 
         if self.icon_path and self.icon_path.exists():
             photo = load_photoimage(self.icon_path, max_size=RomTile.ICON_SIZE)
@@ -310,7 +319,7 @@ class RomTile(ttk.Frame):
         self._update_title_visibility()
 
     def _tile_bg(self):
-        return '#2d2d30' if self.theme_name == 'dark' else '#ffffff'
+        return THEMES[self.theme_name]['card']
 
     def _update_title_visibility(self):
         if self.show_titles.get():
@@ -330,6 +339,33 @@ class RomTile(ttk.Frame):
 
     def _on_click(self):
         self.launch_callback(self.rom_path)
+
+
+# --- Theme Helper ---
+
+def _configure_base_styles(theme_name):
+    """Apply theme colors to the base ttk widget styles used by dialogs."""
+    style = ttk.Style()
+    try:
+        style.theme_use('clam')
+    except tk.TclError:
+        pass
+    palette = THEMES.get(theme_name, THEMES['dark'])
+    bg, fg, card, accent, tb = (palette['bg'], palette['fg'],
+                                palette['card'], palette['accent'], palette['tb'])
+    style.configure('TFrame', background=bg)
+    style.configure('TLabel', background=bg, foreground=fg)
+    style.configure('TEntry',
+                    fieldbackground=card, background=card, foreground=fg,
+                    bordercolor=tb, lightcolor=tb, darkcolor=tb)
+    style.configure('TLabelFrame', background=bg, foreground=fg)
+    style.configure('TButton', background=card, foreground=fg)
+    style.map('TButton',
+              background=[('active', accent)],
+              foreground=[('active', '#ffffff')])
+    style.configure('TRadiobutton', background=bg, foreground=fg)
+    style.configure('TCheckbutton', background=bg, foreground=fg)
+    return bg, fg, card, accent
 
 
 # --- Main Application ---
@@ -394,29 +430,24 @@ class App:
         except tk.TclError:
             pass
 
-        if theme_name == 'dark':
-            bg, fg, card, accent = '#1e1e1e', '#e0e0e0', '#2d2d30', '#007acc'
-        else:
-            bg, fg, card, accent = '#f5f5f5', '#202020', '#ffffff', '#0066cc'
-
+        bg, fg, card, accent = _configure_base_styles(theme_name)
         self.root.configure(background=bg)
         style.configure('Header.TFrame', background=bg)
         style.configure('Header.TButton', foreground=fg, background=card)
         style.map('Header.TButton',
                   background=[('active', accent)],
-                  foreground=[('active', '#ffffff')])
+                  foreground=[('active', accent)])
         style.configure('Toggle.TButton',
                         foreground=fg, background=card, focusthickness=0)
         style.map('Toggle.TButton',
                   background=[('active', accent)],
-                  foreground=[('active', '#ffffff')])
+                  foreground=[('active', accent)])
         style.configure('Tile.TFrame',
                         background=card, relief='flat', borderwidth=0)
         style.configure('Tile.TLabel', background=card, foreground=fg)
-        tb = '#3c3c3c' if theme_name == 'dark' else '#d0d0d0'
         style.configure('Vertical.TScrollbar',
                         background=card, troughcolor=bg,
-                        darkcolor=tb, lightcolor=tb)
+                        darkcolor=THEMES[theme_name]['tb'], lightcolor=THEMES[theme_name]['tb'])
         # Combobox/Entry styling for better contrast in light/dark
         try:
             style.configure('TCombobox', fieldbackground=card, background=card, foreground=fg)
@@ -430,26 +461,26 @@ class App:
             if hasattr(self, 'size_menu') and self.size_menu is not None:
                 self.size_menu.configure(bg=card, fg=fg,
                                          activebackground=accent,
-                                         activeforeground='#ffffff')
+                                         activeforeground=fg)
         except Exception:
             pass
         try:
             if hasattr(self, 'sort_menu') and self.sort_menu is not None:
                 self.sort_menu.configure(bg=card, fg=fg,
                                          activebackground=accent,
-                                         activeforeground='#ffffff')
+                                         activeforeground=fg)
         except Exception:
             pass
 
     # ── Theme color helpers ──
     def _bg_color(self):
-        return '#1e1e1e' if self._theme_name == 'dark' else '#f5f5f5'
+        return THEMES[self._theme_name]['bg']
 
     def _fg_color(self):
-        return '#e0e0e0' if self._theme_name == 'dark' else '#202020'
+        return THEMES[self._theme_name]['fg']
 
     def _accent_color(self):
-        return '#007acc' if self._theme_name == 'dark' else '#0066cc'
+        return THEMES[self._theme_name]['accent']
 
     def _on_size_change(self, event=None):
         """Handle size dropdown change — rebuild tiles with new icon size."""
@@ -524,7 +555,7 @@ class App:
                                             style='Header.TButton')
         size_menu = tk.Menu(self.size_menu_btn, tearoff=0,
                     bg=self._bg_color(), fg=self._fg_color(),
-                    activebackground=self._accent_color(), activeforeground='#ffffff')
+                    activebackground=self._accent_color(), activeforeground=self._fg_color())
         for s in size_values:
             size_menu.add_command(label=s, command=lambda s=s: self._set_size(s))
         self.size_menu_btn['menu'] = size_menu
@@ -539,7 +570,7 @@ class App:
                                             style='Header.TButton')
         sort_menu = tk.Menu(self.sort_menu_btn, tearoff=0,
                      bg=self._bg_color(), fg=self._fg_color(),
-                     activebackground=self._accent_color(), activeforeground='#ffffff')
+                     activebackground=self._accent_color(), activeforeground=self._fg_color())
         for mode, label in SORT_MODES.items():
             sort_menu.add_command(label=label, command=lambda m=mode: self._on_sort_change(m))
         self.sort_menu_btn['menu'] = sort_menu
@@ -692,6 +723,7 @@ class App:
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.protocol('WM_DELETE_WINDOW', dlg.destroy)
+        dlg.configure(bg=self._bg_color())
 
         pad = {'padx': 10, 'pady': 6}
         roms_var = tk.StringVar(value=self.config.get('roms_folder', ''))
@@ -764,6 +796,7 @@ class App:
             if new_theme != self.config.get('theme', 'dark'):
                 self.config['theme'] = new_theme
                 self.apply_theme(new_theme)
+                dlg.configure(bg=self._bg_color())
                 self._canvas_container.configure(bg=self._bg_color())
                 self._canvas.configure(background=self._bg_color())
                 self.tile_container.configure(bg=self._bg_color())

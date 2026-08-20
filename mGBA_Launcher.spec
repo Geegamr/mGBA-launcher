@@ -5,7 +5,7 @@ a = Analysis(
     ['mGBA_Launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('placeholder.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
