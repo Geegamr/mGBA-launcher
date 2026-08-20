@@ -37,11 +37,13 @@ CONFIG_FILE = CONFIG_DIR / 'config.json'
 
 if getattr(sys, 'frozen', False):
     APP_DIR = Path(sys.executable).parent
-    # When frozen, prefer the placeholder bundled inside the exe (sys._MEIPASS)
+    # When frozen, prefer the placeholder + icon bundled inside the exe (sys._MEIPASS)
     PLACEHOLDER_FILE = Path(getattr(sys, '_MEIPASS', APP_DIR)) / 'placeholder.png'
+    ICON_FILE = Path(getattr(sys, '_MEIPASS', APP_DIR)) / 'mGBA_Icon.ico'
 else:
     APP_DIR = Path(__file__).parent
     PLACEHOLDER_FILE = APP_DIR / 'placeholder.png'
+    ICON_FILE = APP_DIR / 'mGBA_Icon.ico'
 
 ROM_EXTENSIONS = {'.gba', '.zip'}
 ICON_EXTENSIONS = ['.png', '.gif', '.jpg', '.jpeg', '.bmp']
@@ -376,6 +378,10 @@ class App:
         self.root.title('mGBA Launcher')
         self.root.geometry('800x600')
         self.root.minsize(600, 400)
+        try:
+            self.root.iconbitmap(str(ICON_FILE))
+        except Exception:
+            pass
 
         self.config = load_config()
         # Initialize user preferences from config (with sensible defaults)

@@ -5,7 +5,7 @@ a = Analysis(
     ['mGBA_Launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('placeholder.png', '.')],
+    datas=[('placeholder.png', '.'), ('mGBA_Icon.ico', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -35,4 +35,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['mGBA_Icon.ico'],
 )
