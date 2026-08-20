@@ -47,6 +47,14 @@ ICON_EXTENSIONS = ['.png', '.gif', '.jpg', '.jpeg', '.bmp']
 # Icon size presets (name -> pixel size)
 SIZES = {'small': 96, 'medium': 144, 'large': 192}
 
+# Sort modes (mode key -> display label)
+SORT_MODES = {
+    'name': 'Name A-Z',
+    'name_desc': 'Name Z-A',
+    'date_new': 'Newest First',
+    'date_old': 'Oldest First',
+}
+
 # --- Default Configuration ---
 
 DEFAULT_CONFIG = {
@@ -56,6 +64,7 @@ DEFAULT_CONFIG = {
     'theme': 'dark',
     'icon_size': 'small',
     'show_titles': True,
+    'sort_mode': 'name',
 }
 
 # --- Image Helpers (stdlib only) ---
@@ -348,6 +357,8 @@ class App:
         self._canvas = None
         self._vsbar = None
         self._theme_label = None
+        self.sort_var = None
+        self.config_btn = None
         self._canvas_window = None
         self._canvas_container = None
 
@@ -422,6 +433,13 @@ class App:
                                          activeforeground='#ffffff')
         except Exception:
             pass
+        try:
+            if hasattr(self, 'sort_menu') and self.sort_menu is not None:
+                self.sort_menu.configure(bg=card, fg=fg,
+                                         activebackground=accent,
+                                         activeforeground='#ffffff')
+        except Exception:
+            pass
 
     # ── Theme color helpers ──
     def _bg_color(self):
@@ -461,12 +479,29 @@ class App:
         except Exception:
             pass
 
+    def _on_sort_change(self, mode):
+        """Handle sort mode change — re-scan ROMs with new sort order."""
+        self.config['sort_mode'] = mode
+        if self.sort_var is not None:
+            self.sort_var.set(SORT_MODES.get(mode, mode))
+        try:
+            save_config(self.config)
+        except Exception:
+            pass
+        self._populate_tiles()
+
     # ── UI Layout ──
     def _setup_ui(self):
         self.apply_theme(self.config.get('theme', 'dark'))
 
         header = ttk.Frame(self.root, style='Header.TFrame')
         header.pack(fill='x', side='top', padx=8, pady=8)
+
+        # Config button (top-right of header)
+        self.config_btn = ttk.Button(header, text='Config',
+                                     style='Header.TButton',
+                                     command=self._show_config_dialog)
+        self.config_btn.pack(side='right', padx=(0, 4))
 
         ttk.Button(header, text='Toggle Theme',
                     style='Header.TButton',
@@ -495,6 +530,21 @@ class App:
         self.size_menu_btn['menu'] = size_menu
         self.size_menu_btn.pack(side='left', padx=(4, 0))
         self.size_menu = size_menu
+
+        # Sort chooser (styled as a header button, next to size)
+        sort_label = ttk.Label(header, text='Sort:', style='Header.TLabel')
+        sort_label.pack(side='left', padx=(8, 0))
+        self.sort_var = tk.StringVar(value=SORT_MODES.get(self.config.get('sort_mode', 'name'), 'Name A-Z'))
+        self.sort_menu_btn = ttk.Menubutton(header, textvariable=self.sort_var,
+                                            style='Header.TButton')
+        sort_menu = tk.Menu(self.sort_menu_btn, tearoff=0,
+                     bg=self._bg_color(), fg=self._fg_color(),
+                     activebackground=self._accent_color(), activeforeground='#ffffff')
+        for mode, label in SORT_MODES.items():
+            sort_menu.add_command(label=label, command=lambda m=mode: self._on_sort_change(m))
+        self.sort_menu_btn['menu'] = sort_menu
+        self.sort_menu_btn.pack(side='left', padx=(4, 0))
+        self.sort_menu = sort_menu
 
         # Show/hide titles button (no theme label anymore)
 
@@ -634,6 +684,116 @@ class App:
         except Exception:
             pass
 
+    def _show_config_dialog(self):
+        """Open a dialog to edit config values without editing config.json directly."""
+        dlg = tk.Toplevel(self.root)
+        dlg.title('mGBA Launcher - Configuration')
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+        dlg.protocol('WM_DELETE_WINDOW', dlg.destroy)
+
+        pad = {'padx': 10, 'pady': 6}
+        roms_var = tk.StringVar(value=self.config.get('roms_folder', ''))
+        icons_var = tk.StringVar(value=self.config.get('icons_folder', ''))
+        mgba_var = tk.StringVar(value=self.config.get('mgba_exe', ''))
+        theme_var = tk.StringVar(value=self.config.get('theme', 'dark'))
+        show_titles_var = tk.BooleanVar(value=self.config.get('show_titles', True))
+
+        def _browse_dir(var, title):
+            d = filedialog.askdirectory(title=title, parent=dlg)
+            if d:
+                var.set(d)
+
+        def _browse_exe(var, title):
+            f = filedialog.askopenfilename(title=title, parent=dlg,
+                filetypes=[('Executable files', '*.exe'), ('All files', '*.*')])
+            if f:
+                var.set(f)
+
+        # ROMs folder
+        frm = ttk.LabelFrame(dlg, text='ROMs Folder')
+        frm.pack(fill='x', **pad)
+        row = ttk.Frame(frm)
+        row.pack(fill='x', **pad)
+        ttk.Entry(row, textvariable=roms_var, width=40).pack(side='left', fill='x', expand=True)
+        ttk.Button(row, text='Browse', command=lambda: _browse_dir(roms_var, 'Select ROMs Folder')).pack(side='left', **pad)
+
+        # Icons folder
+        frm = ttk.LabelFrame(dlg, text='Icons Folder')
+        frm.pack(fill='x', **pad)
+        row = ttk.Frame(frm)
+        row.pack(fill='x', **pad)
+        ttk.Entry(row, textvariable=icons_var, width=40).pack(side='left', fill='x', expand=True)
+        ttk.Button(row, text='Browse', command=lambda: _browse_dir(icons_var, 'Select Icons Folder')).pack(side='left', **pad)
+
+        # mGBA.exe
+        frm = ttk.LabelFrame(dlg, text='mGBA Executable')
+        frm.pack(fill='x', **pad)
+        row = ttk.Frame(frm)
+        row.pack(fill='x', **pad)
+        ttk.Entry(row, textvariable=mgba_var, width=40).pack(side='left', fill='x', expand=True)
+        ttk.Button(row, text='Browse', command=lambda: _browse_exe(mgba_var, 'Select mGBA.exe')).pack(side='left', **pad)
+
+        # Theme
+        frm = ttk.LabelFrame(dlg, text='Theme')
+        frm.pack(fill='x', **pad)
+        row = ttk.Frame(frm)
+        row.pack(fill='x', **pad)
+        ttk.Radiobutton(row, text='Dark', variable=theme_var, value='dark').pack(side='left', **pad)
+        ttk.Radiobutton(row, text='Light', variable=theme_var, value='light').pack(side='left', **pad)
+
+        # Show titles
+        frm = ttk.LabelFrame(dlg, text='Titles')
+        frm.pack(fill='x', **pad)
+        row = ttk.Frame(frm)
+        row.pack(fill='x', **pad)
+        ttk.Checkbutton(row, text='Show ROM titles', variable=show_titles_var).pack(side='left', **pad)
+
+        # Buttons
+        btn_row = ttk.Frame(dlg)
+        btn_row.pack(fill='x', **pad)
+
+        def on_apply():
+            self.config['roms_folder'] = roms_var.get()
+            self.config['icons_folder'] = icons_var.get()
+            self.config['mgba_exe'] = mgba_var.get()
+            new_theme = theme_var.get()
+            new_show_titles = show_titles_var.get()
+
+            if new_theme != self.config.get('theme', 'dark'):
+                self.config['theme'] = new_theme
+                self.apply_theme(new_theme)
+                self._canvas_container.configure(bg=self._bg_color())
+                self._canvas.configure(background=self._bg_color())
+                self.tile_container.configure(bg=self._bg_color())
+                for tile in self.tiles.values():
+                    tile.refresh_theme(new_theme)
+                self._arrange_tiles()
+
+            self.config['show_titles'] = new_show_titles
+            self.show_titles.set(new_show_titles)
+            self._update_titles_button()
+            for tile in self.tiles.values():
+                tile.on_toggle_titles()
+
+            save_config(self.config)
+            self._populate_tiles()
+
+        def on_cancel():
+            dlg.destroy()
+
+        ttk.Button(btn_row, text='Cancel', command=on_cancel).pack(side='right', **pad)
+        ttk.Button(btn_row, text='Apply', command=on_apply).pack(side='right', **pad)
+
+        dlg.bind('<Escape>', lambda e: on_cancel())
+        dlg.update_idletasks()
+        w = dlg.winfo_width()
+        h = dlg.winfo_height()
+        x = self.root.winfo_rootx() + self.root.winfo_width() // 2 - w // 2
+        y = self.root.winfo_rooty() + self.root.winfo_height() // 2 - h // 2
+        dlg.geometry('+{}+{}'.format(x, y))
+
     # ── ROM Scanning ──
     def _scan_roms(self):
         roms_folder = Path(self.config.get('roms_folder', ''))
@@ -643,9 +803,17 @@ class App:
                 'ROMs folder not found:\n  {}\n\n'
                 'Please restart and select a valid folder.'.format(roms_folder))
             return []
-        roms = [f for f in sorted(roms_folder.iterdir())
+        roms = [f for f in roms_folder.iterdir()
                 if f.is_file() and f.suffix.lower() in ROM_EXTENSIONS]
-        roms.sort(key=lambda f: f.name.lower())
+        sort_mode = self.config.get('sort_mode', 'name')
+        if sort_mode == 'date_new':
+            roms.sort(key=lambda f: f.stat().st_mtime, reverse=True)
+        elif sort_mode == 'date_old':
+            roms.sort(key=lambda f: f.stat().st_mtime)
+        elif sort_mode == 'name_desc':
+            roms.sort(key=lambda f: f.name.lower(), reverse=True)
+        else:
+            roms.sort(key=lambda f: f.name.lower())
         return roms
 
     def _find_icon(self, rom_name):
