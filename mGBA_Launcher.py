@@ -12,7 +12,7 @@ Features:
     - First-run setup wizard (folder selection + theme)
     - Uses mGBA.exe to launch ROMs (supports .gba and .zip)
 
-Requirements: Python 3.x with tkinter (standard library only)
+Requirements: Python 3.x with tkinter, plus Pillow (PIL)
 """
 
 import os
