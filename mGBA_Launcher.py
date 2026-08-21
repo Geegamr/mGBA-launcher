@@ -729,7 +729,12 @@ class App:
         dlg.transient(self.root)
         dlg.grab_set()
         dlg.protocol('WM_DELETE_WINDOW', dlg.destroy)
-        dlg.configure(bg=self._bg_color())
+
+        # Current theme colors
+        bg, fg, card, accent = _configure_base_styles(self._theme_name)
+        palette = THEMES[self._theme_name]
+        tb = palette['tb']
+        dlg.configure(bg=bg)
 
         pad = {'padx': 10, 'pady': 6}
         roms_var = tk.StringVar(value=self.config.get('roms_folder', ''))
@@ -749,60 +754,76 @@ class App:
             if f:
                 var.set(f)
 
+        def _make_entry(parent, var):
+            e = tk.Entry(parent, textvariable=var, width=42,
+                         bg=card, fg=fg, insertbackground=fg,
+                         relief='flat', highlightthickness=1,
+                         highlightbackground=tb, highlightcolor=accent,
+                         font=('Segoe UI', 9))
+            return e
+
+        def _section(title):
+            outer = tk.Frame(dlg, bg=bg)
+            outer.pack(fill='x', **pad)
+            lbl = tk.Label(outer, text=title, bg=bg, fg=fg,
+                           font=('Segoe UI', 9, 'bold'), anchor='w')
+            lbl.pack(fill='x', padx=2, pady=(0, 2))
+            inner = tk.Frame(outer, bg=card, highlightthickness=1,
+                             highlightbackground=tb)
+            inner.pack(fill='x')
+            return inner
+
         # ROMs folder
-        frm = ttk.LabelFrame(dlg, text='ROMs Folder')
-        frm.pack(fill='x', **pad)
-        row = ttk.Frame(frm)
-        row.pack(fill='x', **pad)
-        ttk.Entry(row, textvariable=roms_var, width=40).pack(side='left', fill='x', expand=True)
-        ttk.Button(row, text='Browse', command=lambda: _browse_dir(roms_var, 'Select ROMs Folder')).pack(side='left', **pad)
+        sec = _section('ROMs Folder')
+        row = tk.Frame(sec, bg=card)
+        row.pack(fill='x', padx=6, pady=6)
+        _make_entry(row, roms_var).pack(side='left', fill='x', expand=True, padx=(0, 6))
+        ttk.Button(row, text='Browse',
+                   command=lambda: _browse_dir(roms_var, 'Select ROMs Folder')).pack(side='left')
 
         # Icons folder
-        frm = ttk.LabelFrame(dlg, text='Icons Folder')
-        frm.pack(fill='x', **pad)
-        row = ttk.Frame(frm)
-        row.pack(fill='x', **pad)
-        ttk.Entry(row, textvariable=icons_var, width=40).pack(side='left', fill='x', expand=True)
-        ttk.Button(row, text='Browse', command=lambda: _browse_dir(icons_var, 'Select Icons Folder')).pack(side='left', **pad)
+        sec = _section('Icons Folder')
+        row = tk.Frame(sec, bg=card)
+        row.pack(fill='x', padx=6, pady=6)
+        _make_entry(row, icons_var).pack(side='left', fill='x', expand=True, padx=(0, 6))
+        ttk.Button(row, text='Browse',
+                   command=lambda: _browse_dir(icons_var, 'Select Icons Folder')).pack(side='left')
 
         # mGBA.exe
-        frm = ttk.LabelFrame(dlg, text='mGBA Executable')
-        frm.pack(fill='x', **pad)
-        row = ttk.Frame(frm)
-        row.pack(fill='x', **pad)
-        ttk.Entry(row, textvariable=mgba_var, width=40).pack(side='left', fill='x', expand=True)
-        ttk.Button(row, text='Browse', command=lambda: _browse_exe(mgba_var, 'Select mGBA.exe')).pack(side='left', **pad)
+        sec = _section('mGBA Executable')
+        row = tk.Frame(sec, bg=card)
+        row.pack(fill='x', padx=6, pady=6)
+        _make_entry(row, mgba_var).pack(side='left', fill='x', expand=True, padx=(0, 6))
+        ttk.Button(row, text='Browse',
+                   command=lambda: _browse_exe(mgba_var, 'Select mGBA.exe')).pack(side='left')
 
         # Theme
-        frm = ttk.LabelFrame(dlg, text='Theme')
-        frm.pack(fill='x', **pad)
-        row = ttk.Frame(frm)
-        row.pack(fill='x', **pad)
-        ttk.Radiobutton(row, text='Dark', variable=theme_var, value='dark').pack(side='left', **pad)
-        ttk.Radiobutton(row, text='Light', variable=theme_var, value='light').pack(side='left', **pad)
+        sec = _section('Theme')
+        row = tk.Frame(sec, bg=card)
+        row.pack(fill='x', padx=6, pady=6)
+        ttk.Radiobutton(row, text='Dark', variable=theme_var, value='dark').pack(side='left', padx=(0, 12))
+        ttk.Radiobutton(row, text='Light', variable=theme_var, value='light').pack(side='left')
 
-        # Show titles
-        frm = ttk.LabelFrame(dlg, text='Titles')
-        frm.pack(fill='x', **pad)
-        row = ttk.Frame(frm)
-        row.pack(fill='x', **pad)
-        ttk.Checkbutton(row, text='Show ROM titles', variable=show_titles_var).pack(side='left', **pad)
+        # Titles
+        sec = _section('Titles')
+        row = tk.Frame(sec, bg=card)
+        row.pack(fill='x', padx=6, pady=6)
+        ttk.Checkbutton(row, text='Show ROM titles', variable=show_titles_var).pack(side='left')
 
         # Buttons
-        btn_row = ttk.Frame(dlg)
+        btn_row = tk.Frame(dlg, bg=bg)
         btn_row.pack(fill='x', **pad)
 
         def on_apply():
-            self.config['roms_folder'] = roms_var.get()
-            self.config['icons_folder'] = icons_var.get()
-            self.config['mgba_exe'] = mgba_var.get()
+            self.config['roms_folder'] = roms_var.get().strip()
+            self.config['icons_folder'] = icons_var.get().strip()
+            self.config['mgba_exe'] = mgba_var.get().strip()
             new_theme = theme_var.get()
             new_show_titles = show_titles_var.get()
 
             if new_theme != self.config.get('theme', 'dark'):
                 self.config['theme'] = new_theme
                 self.apply_theme(new_theme)
-                dlg.configure(bg=self._bg_color())
                 self._canvas_container.configure(bg=self._bg_color())
                 self._canvas.configure(background=self._bg_color())
                 self.tile_container.configure(bg=self._bg_color())
@@ -818,20 +839,22 @@ class App:
 
             save_config(self.config)
             self._populate_tiles()
+            dlg.destroy()   # close the dialog on Apply
 
         def on_cancel():
             dlg.destroy()
 
-        ttk.Button(btn_row, text='Cancel', command=on_cancel).pack(side='right', **pad)
-        ttk.Button(btn_row, text='Apply', command=on_apply).pack(side='right', **pad)
+        ttk.Button(btn_row, text='Cancel', command=on_cancel).pack(side='right', padx=(4, 0))
+        ttk.Button(btn_row, text='Apply', command=on_apply).pack(side='right')
 
         dlg.bind('<Escape>', lambda e: on_cancel())
         dlg.update_idletasks()
-        w = dlg.winfo_width()
-        h = dlg.winfo_height()
+        w = dlg.winfo_reqwidth()
+        h = dlg.winfo_reqheight()
         x = self.root.winfo_rootx() + self.root.winfo_width() // 2 - w // 2
         y = self.root.winfo_rooty() + self.root.winfo_height() // 2 - h // 2
-        dlg.geometry('+{}+{}'.format(x, y))
+        dlg.geometry(f'+{x}+{y}')
+        dlg.focus_set()
 
     # ── ROM Scanning ──
     def _scan_roms(self):

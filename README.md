@@ -15,12 +15,12 @@ Features
 - Dark and Light themes
 - Image decoding via Pillow (PNG/JPEG/GIF)
 - Placeholder icon generation when needed
+- Sort by name and additional sort options
 
 Planned features
 
 - Favorites (star + filter)
 - Search bar
-- Sort by name and additional sort options
 
 Requirements
 
