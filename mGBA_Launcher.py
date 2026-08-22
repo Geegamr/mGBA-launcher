@@ -109,6 +109,25 @@ def create_placeholder_png(path, size=96):
             f.write(png)
 
 
+def _hex_to_rgb(hex_color):
+    # Convert '#rrggbb' to an (r, g, b) tuple.
+    h = hex_color.lstrip('#')
+    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+
+def make_search_icon(fg_hex):
+    # Draw a magnifying-glass search icon in the current theme color.
+    try:
+        size = 22
+        img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        color = fg_hex if isinstance(fg_hex, tuple) else _hex_to_rgb(fg_hex)
+        d.ellipse([3, 3, 14, 14], outline=color, width=2)
+        d.line([(13, 13), (19, 19)], fill=color, width=2)
+        return ImageTk.PhotoImage(img)
+    except Exception:
+        return None
+
 def load_photoimage(path, max_size=96):
     """Load and resize an image with Pillow; return a PhotoImage or None."""
     try:
@@ -401,6 +420,11 @@ class App:
         self._theme_label = None
         self.sort_var = None
         self.config_btn = None
+        self.search_btn = None
+        self.search_entry = None
+        self._search_photo = None
+        self._search_open = False
+        self._search_text = ''
         self._canvas_window = None
         self._canvas_container = None
 
@@ -478,6 +502,16 @@ class App:
         except Exception:
             pass
 
+        # Refresh the search icon when the theme changes
+        try:
+            if getattr(self, 'search_btn', None) is not None:
+                photo = make_search_icon(self._fg_color())
+                if photo is not None:
+                    self._search_photo = photo
+                    self.search_btn.configure(image=photo)
+        except Exception:
+            pass
+
     # ── Theme color helpers ──
     def _bg_color(self):
         return THEMES[self._theme_name]['bg']
@@ -539,6 +573,22 @@ class App:
                                      style='Header.TButton',
                                      command=self._show_config_dialog)
         self.config_btn.pack(side='right', padx=(0, 4))
+
+        # Search: toggle-able search bar that filters the ROM tiles live.
+        self.search_var = tk.StringVar()
+        self.search_entry = ttk.Entry(header, textvariable=self.search_var,
+                                      width=24)
+        self.search_entry.bind('<KeyRelease>', self._on_search_key)
+        self.search_entry.bind('<Escape>', lambda e: self._close_search())
+
+        self._search_photo = make_search_icon(self._fg_color())
+        self.search_btn = ttk.Button(header, style='Header.TButton',
+                                     command=self._toggle_search)
+        if self._search_photo is not None:
+            self.search_btn.configure(image=self._search_photo)
+        else:
+            self.search_btn.configure(text='Search')
+        self.search_btn.pack(side='right', padx=(0, 4))
 
         ttk.Button(header, text='Toggle Theme',
                     style='Header.TButton',
@@ -720,6 +770,30 @@ class App:
             save_config(self.config)
         except Exception:
             pass
+
+    # ── Search ──
+    def _toggle_search(self):
+        if self._search_open:
+            self._close_search()
+        else:
+            self._open_search()
+
+    def _open_search(self):
+        self._search_open = True
+        self.search_entry.pack(side='right', padx=(4, 4))
+        self.search_entry.focus_set()
+
+    def _close_search(self):
+        self._search_open = False
+        self.search_entry.pack_forget()
+        if self.search_var.get():
+            self.search_var.set('')
+            self._search_text = ''
+            self._populate_tiles()
+
+    def _on_search_key(self, event=None):
+        self._search_text = self.search_var.get().strip().lower()
+        self._populate_tiles()
 
     def _show_config_dialog(self):
         """Open a dialog to edit config values without editing config.json directly."""
@@ -916,6 +990,10 @@ class App:
             tile.destroy()
         self.tiles.clear()
         roms = self._scan_roms()
+        # Apply the active search filter (empty query keeps all ROMs)
+        if self._search_text:
+            roms = [p for p in roms
+                    if self._search_text in p.stem.lower()]
         # Ensure RomTile uses the current icon size when building
         RomTile.ICON_SIZE = self.icon_size
         for rom_path in roms:

@@ -1,5 +1,5 @@
 #-------------Chat AI Handoffs-------------
-Chat Handoffs/Handoff-*.md
+Chat Handoffs/
 #-------------Everything else-------------
 .venv/
 build/
@@ -9,3 +9,4 @@ __pycache__/
 *.log
 .vscode/
 tools/
+*.bat
